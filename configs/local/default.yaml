@@ -1,0 +1,21 @@
+# @package _global_
+
+defaults:
+  - override /hydra/launcher: submitit_slurm
+
+device: cpu
+
+paths:
+  log_dir: ${oc.env:VSC_DATA_VO_USER}/design_project/napari-sparrow/logs/
+  data_dir: ${oc.env:VSC_DATA_VO_USER}/design_project/napari-sparrow/data/
+
+hydra:
+  launcher:
+    submitit_folder: ${hydra.sweep.dir}/.submitit/%j
+    timeout_min: 60
+    cpus_per_task: 4
+    gpus_per_node: 1
+    tasks_per_node: 1
+    mem_gb: 8
+    nodes: 1
+    name: ${hydra.job.name}
