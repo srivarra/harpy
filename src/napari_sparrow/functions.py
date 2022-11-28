@@ -42,6 +42,20 @@ def tilingCorrection(
     tiles = img.generate_equal_crops(size=2144, as_array="image")
     tiles = np.array([tile + 1 if ~np.any(tile) else tile for tile in tiles])
 
+    # Check for deleted tiles
+    n_tiles = len(tiles)
+    uniq_tiles, uniq_counts = np.unique(tiles, axis=0, return_counts=True)
+    uniq_tiles = uniq_tiles[uniq_counts<2]
+
+    if len(uniq_tiles) != n_tiles:
+
+        print("Tile deletion found:")
+        print('- Total tiles: {}\n- Deleted tiles: {}'.format(n_tiles, n_tiles-len(uniq_tiles)))
+
+        for i, tile in enumerate(tiles):
+            if tile not in uniq_tiles:
+                tiles[i] = np.zeros_like(tile)
+
     # Measure the filters
     # BaSiC has no support for gpu devices, see https://github.com/peng-lab/BaSiCPy/issues/101
     basic = BaSiC(epsilon=1e-06)
@@ -52,6 +66,11 @@ def tilingCorrection(
     tiles_corrected = np.array(
         [tile + 1 if ~np.any(tile) else tile for tile in tiles_corrected]
     )
+
+    uniq_tiles, uniq_counts = np.unique(tiles_corrected, axis=0, return_counts=True)
+    uniq_tiles = uniq_tiles[uniq_counts<2]
+    print('After tile correction')
+    print('- Total tiles: {}\n- Deleted tiles: {}'.format(n_tiles, n_tiles-len(uniq_tiles)))
 
     # Stitch the tiles back together
     i_new = np.block(
@@ -231,8 +250,11 @@ def segmentation(
 
     channels = np.array(channels)
 
+    # Check for gpu
+    gpu = torch.cuda.is_available()
+
     # Perform cellpose segmentation
-    model = models.Cellpose(device=torch.device(device), model_type=model_type)
+    model = models.Cellpose(gpu=gpu, device=torch.device(device), model_type=model_type)
     masks, _, _, _ = model.eval(
         img.data.image.squeeze().to_numpy(),
         diameter=diameter,
@@ -989,6 +1011,9 @@ def enrichment_plot(adata: AnnData, output: str = None) -> None:
     if output:
         plt.ioff()
 
+    # remove 'nan' values from "adata.uns['maxScores_nhood_enrichment']['zscore']"
+    tmp = adata.uns['maxScores_nhood_enrichment']['zscore']
+    adata.uns['maxScores_nhood_enrichment']['zscore'] = np.nan_to_num(tmp)
     sq.pl.nhood_enrichment(adata, cluster_key="maxScores", method="ward")
 
     # Save the plot to ouput
