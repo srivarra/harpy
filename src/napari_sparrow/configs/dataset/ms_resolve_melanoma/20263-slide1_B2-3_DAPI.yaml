@@ -1,0 +1,8 @@
+# @package dataset
+
+defaults:
+- resolve_melanoma
+
+image: ${dataset.data_dir}/20263-slide1_B2-3_DAPI.tiff
+coords: ${dataset.data_dir}/20263-slide1_B2-3_results.txt
+

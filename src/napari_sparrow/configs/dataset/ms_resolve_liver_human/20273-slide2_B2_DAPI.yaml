@@ -1,0 +1,8 @@
+# @package dataset
+
+defaults:
+- resolve_liver_human
+
+image: ${dataset.data_dir}/20273-slide2_B2_DAPI.tiff
+coords: ${dataset.data_dir}/20273-slide2_B2_results.txt
+

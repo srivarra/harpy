@@ -1,0 +1,5 @@
+data_dir: ${paths.data_dir}/resolve_liver_human
+dtype: tiff
+image: ${dataset.data_dir}/20273_slide2_A2_DAPI.tiff
+coords: ${dataset.data_dir}/20273_slide2_A2_results.txt
+markers: ${dataset.data_dir}/markerGeneListMartinNoLow.csv
