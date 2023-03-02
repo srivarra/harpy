@@ -1,3 +1,4 @@
 data_dir: ${paths.data_dir}/vizgen_liver/
 dtype: xarray
-coords: null
+coords: ${dataset.data_dir}/detected_transcripts.csv
+markers: ${dataset.data_dir}/markerGenesVizgen.csv

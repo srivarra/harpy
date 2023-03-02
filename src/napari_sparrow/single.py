@@ -17,7 +17,6 @@ def check_config(cfg: DictConfig):
     for p in [
         cfg.paths.data_dir,
         cfg.dataset.data_dir,
-        cfg.dataset.image,
         cfg.dataset.coords,
         cfg.paths.output_dir,
     ]:
@@ -39,7 +38,7 @@ def main(cfg: DictConfig) -> None:
     results: dict[str, Any] = {}
 
     # Clean
-    cfg, results = pf.clean(cfg, results)
+    # cfg, results = pf.clean(cfg, results)
 
     # Segment
     cfg, results = pf.segment(cfg, results)
