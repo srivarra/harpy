@@ -38,7 +38,7 @@ def main(cfg: DictConfig) -> None:
     results: dict[str, Any] = {}
 
     # Clean
-    # cfg, results = pf.clean(cfg, results)
+    cfg, results = pf.clean(cfg, results)
 
     # Segment
     cfg, results = pf.segment(cfg, results)

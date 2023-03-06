@@ -55,6 +55,27 @@ def read_in_zarr(path_to_zarr_file,zyx_order=[0,1,2]):
 
     return ic
 
+
+def small_size_vis_check(
+    img: sq.im.ImageContainer, 
+    small_size_vis: List[int] = None):
+    """Returns new small_size_vis coordinates if neccesary
+    Check the size of the img and adjust small_size_vis value if they exceed the size of the img
+    """
+    y, x = img.data.shape
+    # x-axis
+    if x < small_size_vis[3]-small_size_vis[2]:
+        small_size_vis[2], small_size_vis[3] = 0, x
+    elif x < small_size_vis[2] or x < small_size_vis[3]:
+        small_size_vis[2], small_size_vis[3] = 0, small_size_vis[3]-small_size_vis[2]
+    # y-axis
+    if y < small_size_vis[1]-small_size_vis[0]:
+        small_size_vis[0], small_size_vis[1] = 0, y
+    elif y < small_size_vis[0] or y < small_size_vis[1]:
+        small_size_vis[0], small_size_vis[1] = 0, small_size_vis[1]-small_size_vis[0]
+    return small_size_vis
+
+
 def create_subset_image(ic,crd):
     """Reads in sq image container and returns a subset in a sq.imagecontainer"""
     Xmax=ic.data.sizes['x']
@@ -81,6 +102,20 @@ def tilingCorrection(
     tiles = img.generate_equal_crops(size=2144, as_array="image")
     tiles = np.array([tile + 1 if ~np.any(tile) else tile for tile in tiles])
 
+    # Check for deleted tiles
+    n_tiles = len(tiles)
+    uniq_tiles, uniq_counts = np.unique(tiles, axis=0, return_counts=True)
+    uniq_tiles = uniq_tiles[uniq_counts<2]
+
+    if len(uniq_tiles) != n_tiles:
+
+        print("Tile deletion found:")
+        print('- Total tiles: {}\n- Deleted tiles: {}'.format(n_tiles, n_tiles-len(uniq_tiles)))
+
+        for i, tile in enumerate(tiles):
+            if tile not in uniq_tiles:
+                tiles[i] = np.zeros_like(tile)
+
     # Measure the filters
     # BaSiC has no support for gpu devices, see https://github.com/peng-lab/BaSiCPy/issues/101
     basic = BaSiC(epsilon=1e-06)
@@ -91,6 +126,10 @@ def tilingCorrection(
     tiles_corrected = np.array(
         [tile + 1 if ~np.any(tile) else tile for tile in tiles_corrected]
     )
+
+    # After title correction
+    uniq_tiles, uniq_counts = np.unique(tiles_corrected, axis=0, return_counts=True)
+    uniq_tiles = uniq_tiles[uniq_counts<2]
 
     # Stitch the tiles back together
     i_new = np.block(
@@ -220,6 +259,7 @@ def preprocessImagePlot(
 
     # Plot small part of the images
     if small_size_vis is not None:
+        small_size_vis = small_size_vis_check(img=img, small_size_vis=small_size_vis)
         fig2, ax2 = plt.subplots(1, 2, figsize=(20, 10))
         ax2[0].imshow(
             img[
@@ -243,8 +283,9 @@ def preprocessImagePlot(
             plt.close(fig2)
             fig2.savefig(output + "1.png")
 
-def cellpose(img, min_size=80,cellprob_threshold=-4, flow_threshold=0.85, diameter=100, model_type="cyto",channels=[1,0],device='cpu'):
-    model = models.Cellpose(model_type=model_type,device=torch.device(device))
+
+def cellpose(img, min_size=80,cellprob_threshold=-4, flow_threshold=0.85, diameter=100, model_type="cyto",channels=[1,0],device='cpu',gpu=False):
+    model = models.Cellpose(gpu=gpu, model_type=model_type,device=torch.device(device))
     masks, _, _, _ = model.eval(
         img,
         diameter=diameter,
@@ -254,7 +295,8 @@ def cellpose(img, min_size=80,cellprob_threshold=-4, flow_threshold=0.85, diamet
         cellprob_threshold=cellprob_threshold,
     )
     return masks   
-            
+
+
 def segmentation(
     img: sq.im.ImageContainer,
     device: str = "cpu",
@@ -264,10 +306,12 @@ def segmentation(
     cellprob_threshold: int = 0,
     model_type: str = "nuclei",
     channels =[0, 0],
-    ): 
+    ):
 
-    
-    sq.im.segment(img=img, layer="image", method=cellpose,chunks='auto',min_size=min_size,cellprob_threshold=cellprob_threshold, flow_threshold=flow_threshold, diameter=diameter, model_type=model_type,channels=channels,device=device)
+    # Check for gpu
+    gpu = torch.cuda.is_available()
+
+    sq.im.segment(img=img, layer="image", method=cellpose,chunks='auto',min_size=min_size,cellprob_threshold=cellprob_threshold, flow_threshold=flow_threshold, diameter=diameter, model_type=model_type,channels=channels,device=device,gpu=gpu)
     masks=img.data.segmented_custom.squeeze().to_numpy()
     mask_i = np.ma.masked_where(masks == 0, masks)
 
@@ -278,8 +322,12 @@ def segmentation(
     #polygons["color"] = polygons.geometry.map(fc.color)
     polygons["cells"] = polygons.index
     polygons = polygons.dissolve(by="cells")
+    #polygons.index = list(map(str, polygons.index))
+
+    img.add_img(masks, layer="segment_cellpose")
+
     return masks, mask_i, polygons, img            
-            
+
 
 def segmentationDeprecated(
     img: sq.im.ImageContainer,
@@ -396,6 +444,7 @@ def segmentationPlot_deprecated(
         plt.close(fig)
         fig.savefig(output + ".png")
 
+
 def segmentationPlot(
     ic,
     mask_i=None,
@@ -488,6 +537,7 @@ def linewidth(r: bool) -> float:
     """Select linewidth 1 if true else 0.5."""
     return 1 if r else 0.5
 
+
 def delete_overlap(voronoi,polygons):
     
     I1,I2=voronoi.sindex.query_bulk(voronoi['geometry'], predicate="overlaps")  
@@ -502,6 +552,7 @@ def delete_overlap(voronoi,polygons):
             
     voronoi['geometry']=voronoi.geometry.union(polygons.geometry)
     return voronoi
+
 
 def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id: str = "spatial_transcriptomics",radius=0,polygons=None, verbose=False
     ):
@@ -583,6 +634,8 @@ def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id:
     #adata.uns["spatial"][library_id]["segmentation"] = masks.astype(np.uint16)
 
     return adata,df
+
+
 def create_adata_quick(
     path: str, ic: sq.im.ImageContainer, masks: np.ndarray, library_id: str = "melanoma"
 ) -> AnnData:
@@ -654,6 +707,7 @@ def create_adata_quick(
     )
 
     return adata
+
 
 def plot_shapes(
     adata,
@@ -837,7 +891,7 @@ def extract(ic: sq.im.ImageContainer, adata: AnnData) -> AnnData:
     """This function performs segmenation feature extraction and adds cell area and mean intensity to the annData object under obsm segmentation_features."""
     sq.im.calculate_image_features(
         adata,
-        ic,
+        ic, 
         layer="image",
         features="segmentation",
         key_added="segmentation_features",
@@ -1229,6 +1283,9 @@ def enrichment_plot(adata: AnnData, output: str = None) -> None:
     if output:
         plt.ioff()
 
+    # remove 'nan' values from "adata.uns['maxScores_nhood_enrichment']['zscore']"
+    tmp = adata.uns['maxScores_nhood_enrichment']['zscore']
+    adata.uns['maxScores_nhood_enrichment']['zscore'] = np.nan_to_num(tmp)
     sq.pl.nhood_enrichment(adata, cluster_key="maxScores", method="ward")
 
     # Save the plot to ouput

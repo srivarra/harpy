@@ -1,5 +1,10 @@
+# @package clean
+
+defaults:
+- default
+
 tilingCorrection: False
 #tile_size: 2144
+size_tophat: 45
 size_tophat: 135
 contrast_clip: 18.5
-small_size_vis: [3000, 6000, 5000, 9000]
