@@ -14,15 +14,25 @@ log = utils.get_pylogger(__name__)
 def clean(cfg: DictConfig, results: dict) -> DictConfig:
     """Cleaning step, the first step of the pipeline, performs tilingCorrection and preprocessing of the image to improve image quality."""
 
-    # Read in the image, load into ImageContainer
-    img = io.imread(cfg.dataset.image)
-    ic = sq.ImageContainer(img)
-
     # Image subset for faster processing
     left_corner, size = None, None
     if cfg.subset:
         left_corner, size = utils.parse_subset(cfg.subset)
         log.info(f"Subset is {str(cfg.subset)}")
+
+    # Read in the xarray image with url
+    if cfg.dataset.url and cfg.dataset.dtype == 'xarray':
+        subset = None
+        if cfg.subset:
+            subset = [left_corner[0], left_corner[0]+size[0], 
+                      left_corner[1], left_corner[1]+size[1]]
+        ic = fc.read_in_zarr(cfg.dataset.url, subset=subset)
+        img = ic.data.image.squeeze().to_numpy()
+    
+    # Read in the image, load into ImageContainer
+    else:    
+        img = io.imread(cfg.dataset.image)
+        ic = sq.ImageContainer(img)
 
     # Perform tilingCorrection on the whole image, corrects illumination and performs inpainting
     if cfg.clean.tilingCorrection:
@@ -120,9 +130,18 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
     img = results["preprocessimg"]
 
     # Create the adata object with from the masks and the transcripts
-    adata = fc.create_adata_quick(
-        cfg.dataset.coords, img, masks, cfg.allocate.library_id
-    )
+    if cfg.dataset.sample == "vizgen":
+        log.info(f"Offset input type is {type(cfg.dataset.offset)}")
+        ddf = fc.read_in_Vizgen(
+            cfg.dataset.coords, offset=cfg.dataset.offset, 
+            bbox=[-41.61239999999996,-107.97948000000231], pixelSize=0.108, filterGenes=["Blank-"]
+        )
+        adata, _ = fc.allocation(ddf, img, masks, cfg.allocate.library_id)
+
+    else:
+        adata = fc.create_adata_quick(
+            cfg.dataset.coords, img, masks, cfg.allocate.library_id
+        )
 
     # Write plots to given path if output is enabled
     if "polygons" in cfg.paths:

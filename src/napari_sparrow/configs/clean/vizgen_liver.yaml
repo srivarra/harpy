@@ -4,7 +4,6 @@ defaults:
 - default
 
 tilingCorrection: False
-#tile_size: 2144
-size_tophat: 45
+tile_size: False
 size_tophat: 135
 contrast_clip: 18.5

@@ -36,7 +36,7 @@ from shapely.geometry import Polygon
 from shapely.geometry.polygon import LinearRing
 
 
-def read_in_zarr(path_to_zarr_file,zyx_order=[0,1,2]):
+def read_in_zarr(path_to_zarr_file,zyx_order=[0,1,2],subset=None):
     """This function read in a zarr file containing the tissue image. If a z-stack is present, automatically, a z-projection is performed.
      A quidpy imagecontainer is returned."""
     da = dask.array.from_zarr(path_to_zarr_file)
@@ -51,8 +51,9 @@ def read_in_zarr(path_to_zarr_file,zyx_order=[0,1,2]):
     )
     if da.z.shape[0]>1:
         da=da.max(dim='z')
+    if subset:    
+        da=da[subset[0]:subset[1],subset[2]:subset[3]]
     ic = sq.im.ImageContainer(da)    
-
     return ic
 
 
@@ -559,7 +560,7 @@ def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id:
     
     # Create the polygon shapes for the mask
     if polygons is None:
-        polygons = fc.mask_to_polygons_layer(masks)
+        polygons = mask_to_polygons_layer(masks)
         polygons["cells"] = polygons.index
         polygons = polygons.dissolve(by="cells")
     polygons.index = list(map(str, polygons.index))
