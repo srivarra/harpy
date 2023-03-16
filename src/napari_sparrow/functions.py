@@ -604,8 +604,8 @@ def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id:
     # Calculate the mean of the transcripts for every cell
     coordinates = df.groupby(["cells"]).mean().loc[:, ['x', 'y']]
     cell_counts = df.groupby(["cells", "gene"]).size().unstack(fill_value=0)
-    print('finished groupbe')
-        # Create the anndata object
+    # print('finished groupbe')
+    # Create the anndata object
     adata = AnnData(cell_counts[cell_counts.index != 0])
     coordinates.index = coordinates.index.map(str)
     adata.obsm["spatial"] = coordinates[coordinates.index != "0"].values
@@ -1367,8 +1367,8 @@ def read_in_Vizgen(path_genes,xcol='global_x',ycol='global_y',genecol='gene',ski
         in_df['x'] /= pixelSize
         in_df['y'] /= pixelSize
     if offset:
-            in_df['x'] -= offset[0]   
-            in_df['y'] -= offset[1]
+        in_df['x'] -= offset[0]   
+        in_df['y'] -= offset[1]
     
     in_df=in_df.dropna()
     

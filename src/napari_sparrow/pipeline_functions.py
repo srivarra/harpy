@@ -16,14 +16,14 @@ def clean(cfg: DictConfig, results: dict) -> DictConfig:
 
     # Image subset for faster processing
     left_corner, size = None, None
-    if cfg.subset:
-        left_corner, size = utils.parse_subset(cfg.subset)
-        log.info(f"Subset is {str(cfg.subset)}")
+    if cfg.dataset.subset:
+        left_corner, size = utils.parse_subset(cfg.dataset.subset)
+        log.info(f"Subset is {str(cfg.dataset.subset)}")
 
     # Read in the xarray image with url
     if cfg.dataset.url and cfg.dataset.dtype == 'xarray':
         subset = None
-        if cfg.subset:
+        if cfg.dataset.subset:
             subset = [left_corner[0], left_corner[0]+size[0], 
                       left_corner[1], left_corner[1]+size[1]]
         ic = fc.read_in_zarr(cfg.dataset.url, subset=subset)
@@ -131,7 +131,6 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
 
     # Create the adata object with from the masks and the transcripts
     if cfg.dataset.sample == "vizgen":
-        log.info(f"Offset input type is {type(cfg.dataset.offset)}")
         ddf = fc.read_in_Vizgen(
             cfg.dataset.coords, offset=cfg.dataset.offset, 
             bbox=[-41.61239999999996,-107.97948000000231], pixelSize=0.108, filterGenes=["Blank-"]
