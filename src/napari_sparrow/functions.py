@@ -873,10 +873,7 @@ def clustercleanliness(
         for gene, indexes in gene_indexes.items():
             adata = remove_celltypes(gene, gene_celltypes, adata)
 
-        celltypes_f = np.delete(celltypes, list(chain(*gene_indexes.values())))  # type: ignore
-        celltypes_f = np.append(celltypes_f, list(gene_indexes.keys()))
-
-    # Create custom colormap for clusters
+    # Create colormap automatically
     if not colors:
         cmap = plt.get_cmap('viridis')
         colors = []
@@ -887,12 +884,14 @@ def clustercleanliness(
             colors.append(color)
 
     adata.uns["clean_celltypes_colors"] = colors
+    color_dict = dict(zip(adata.obs["clean_celltypes"].cat.categories, adata.uns["clean_celltypes_colors"]))
 
-    return adata
+    return adata, color_dict
 
 
 def clustercleanlinessPlot(
     adata: AnnData,
+    color_dict: dict,
     crop_coord: List[int] = [0, 2000, 0, 2000],
     clean: bool = True,
     output: str = None,
@@ -915,11 +914,12 @@ def clustercleanlinessPlot(
         .pivot("leiden", color)
         .fillna(0)
     )
+
     stacked_norm = stacked.div(stacked.sum(axis=1), axis=0)
     stacked_norm.columns = list(adata.obs[color].cat.categories)
     fig, ax = plt.subplots(1, 1, figsize=(10, 5))
 
-    stacked_norm.plot(kind="bar", stacked=True, ax=fig.gca())
+    stacked_norm.plot(kind="bar", stacked=True, ax=fig.gca(), color=color_dict)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
