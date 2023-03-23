@@ -35,7 +35,6 @@ from longsgis import voronoiDiagram4plg
 from shapely.geometry import Polygon
 from shapely.geometry.polygon import LinearRing
 
-
 def read_in_zarr(path_to_zarr_file,zyx_order=[0,1,2],subset=None):
     """This function read in a zarr file containing the tissue image. If a z-stack is present, automatically, a z-projection is performed.
      A quidpy imagecontainer is returned."""
@@ -1020,6 +1019,7 @@ def scoreGenes(
     scores = (temp[1] - temp[0]) / ((temp[1] + temp[0]) / 2)
     adata.obs["Cleanliness"] = scores.values
     adata.obs["maxScores"] = scoresper_cluster.idxmax(axis=1)
+    adata.obs["maxScores"] = adata.obs["maxScores"].astype('category')
 
     return genes_dict, scoresper_cluster
 
@@ -1033,11 +1033,14 @@ def scoreGenesPlot(
 ) -> None:
     """This function plots the cleanliness and the leiden score next to the maxscores."""
 
-    # Custom colormap:
-    colors = np.concatenate(
-        (plt.get_cmap("tab20c")(np.arange(20)), plt.get_cmap("tab20b")(np.arange(20)))
-    )
-    colors = [mpl.rgb2hex(colors[j * 4 + i]) for i in range(4) for j in range(10)]
+    # Create list of hex code colors with length of number of cell types
+    cmap = plt.get_cmap('viridis')
+    colors = []
+    num_colors = len(adata.obs["maxScores"].cat.categories)
+    for i in np.linspace(0, 1, num_colors):
+        rgba = cmap(i)
+        color = "#{:02x}{:02x}{:02x}".format(int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255))
+        colors.append(color)
 
     # disable interactive mode
     if output:
@@ -1123,18 +1126,18 @@ def annotate_maxscore(types: str, indexes: dict, adata: AnnData) -> AnnData:
 
     Adds types to the Anndata maxscore category.
     """
-    adata.obs.maxScores = adata.obs.maxScores.cat.add_categories([types])
-    for i, val in enumerate(adata.obs.maxScores):
+    adata.obs.clean_celltypes = adata.obs.clean_celltypes.cat.add_categories([types])
+    for i, val in enumerate(adata.obs.clean_celltypes):
         if val in indexes[types]:
-            adata.obs.maxScores[i] = types
+            adata.obs.clean_celltypes[i] = types
     return adata
 
 
 def remove_celltypes(types: str, indexes: dict, adata: AnnData) -> AnnData:
     """Returns the AnnData object."""
     for index in indexes[types]:
-        if index in adata.obs.maxScores.cat.categories:
-            adata.obs.maxScores = adata.obs.maxScores.cat.remove_categories(index)
+        if index in adata.obs.clean_celltypes.cat.categories:
+            adata.obs.clean_celltypes = adata.obs.clean_celltypes.cat.remove_categories(index)
     return adata
 
 
@@ -1146,29 +1149,10 @@ def clustercleanliness(
 ) -> Tuple[AnnData, Optional[dict]]:
     """Returns a tuple with the AnnData object and the color dict."""
     celltypes = np.array(sorted(genes), dtype=str)
-    color_dict = None
-
-    adata.obs["maxScores"] = adata.obs[
-        [col for col in adata.obs if col in celltypes]
-    ].idxmax(axis=1)
-    adata.obs.maxScores = adata.obs.maxScores.astype("category")
-
-    # Create custom colormap for clusters
-    if not colors:
-        color = np.concatenate(
-            (
-                plt.get_cmap("tab20c")(np.arange(20)),
-                plt.get_cmap("tab20b")(np.arange(20)),
-            )
-        )
-        colors = [mpl.rgb2hex(color[j * 4 + i]) for i in range(4) for j in range(10)]
-
-    adata.uns["maxScores_colors"] = colors
+    adata.obs["clean_celltypes"] = adata.obs.maxScores
 
     if gene_indexes:
-        adata.obs["maxScoresSave"] = adata.obs.maxScores
         gene_celltypes = {}
-
         for key, value in gene_indexes.items():
             gene_celltypes[key] = celltypes[value]
 
@@ -1178,26 +1162,26 @@ def clustercleanliness(
         for gene, indexes in gene_indexes.items():
             adata = remove_celltypes(gene, gene_celltypes, adata)
 
-        celltypes_f = np.delete(celltypes, list(chain(*gene_indexes.values())))  # type: ignore
-        celltypes_f = np.append(celltypes_f, list(gene_indexes.keys()))
-        color_dict = dict(zip(celltypes_f, adata.uns["maxScores_colors"]))
+    # Create colormap automatically
+    if not colors:
+        cmap = plt.get_cmap('viridis')
+        colors = []
+        num_colors = len(adata.obs["clean_celltypes"].cat.categories)
+        for i in np.linspace(0, 1, num_colors):
+            rgba = cmap(i)
+            color = "#{:02x}{:02x}{:02x}".format(int(rgba[0]*255), int(rgba[1]*255), int(rgba[2]*255))
+            colors.append(color)
 
-    else:
-        color_dict = dict(zip(celltypes, adata.uns["maxScores_colors"]))
-
-    for i, name in enumerate(color_dict.keys()):
-        color_dict[name] = colors[i]
-    adata.uns["maxScores_colors"] = list(
-        map(color_dict.get, adata.obs.maxScores.cat.categories.values)
-    )
+    adata.uns["clean_celltypes_colors"] = colors
+    color_dict = dict(zip(adata.obs["clean_celltypes"].cat.categories, adata.uns["clean_celltypes_colors"]))
 
     return adata, color_dict
 
-
 def clustercleanlinessPlot(
     adata: AnnData,
+    color_dict: dict,
     crop_coord: List[int] = [0, 2000, 0, 2000],
-    color_dict: dict = None,
+    clean: bool = True,
     output: str = None,
     library_id='melanoma'
 ) -> None:
@@ -1208,21 +1192,23 @@ def clustercleanlinessPlot(
         plt.ioff()
 
     # Create the barplot
+    if clean:
+        color = "clean_celltypes"
+    else:
+        color = "maxScores"
+
     stacked = (
-        adata.obs.groupby(["leiden", "maxScores"], as_index=False)
+        adata.obs.groupby(["leiden", color], as_index=False)
         .size()
-        .pivot("leiden", "maxScores")
+        .pivot("leiden", color)
         .fillna(0)
     )
+
     stacked_norm = stacked.div(stacked.sum(axis=1), axis=0)
-    stacked_norm.columns = list(adata.obs.maxScores.cat.categories)
+    stacked_norm.columns = list(adata.obs[color].cat.categories)
     fig, ax = plt.subplots(1, 1, figsize=(10, 5))
 
-    # Use custom colormap
-    if color_dict:
-        stacked_norm.plot(kind="bar", stacked=True, ax=fig.gca(), color=color_dict)
-    else:
-        stacked_norm.plot(kind="bar", stacked=True, ax=fig.gca())
+    stacked_norm.plot(kind="bar", stacked=True, ax=fig.gca())
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
@@ -1240,11 +1226,11 @@ def clustercleanlinessPlot(
 
     # Plot images with colored celltypes
     plot_shapes(
-        adata, column="maxScores", alpha=0.8, output=output + "1" if output else None, library_id=library_id
+        adata, column=color, alpha=0.8, output=output + "1" if output else None, library_id=library_id
     )
     plot_shapes(
         adata,
-        column="maxScores",
+        column=color,
         crd=crop_coord,
         alpha=0.8,
         output=output + "2" if output else None,
@@ -1253,7 +1239,7 @@ def clustercleanlinessPlot(
 
     # Plot clusters
     _, ax = plt.subplots(1, 1, figsize=(15, 10))
-    sc.pl.umap(adata, color=["maxScores"], ax=ax, size=60, show=not output)
+    sc.pl.umap(adata, color=[color], ax=ax, size=60, show=not output)
     ax.axis("off")
 
     # Save the plot to ouput
@@ -1280,25 +1266,99 @@ def enrichment(adata: AnnData) -> AnnData:
     # Calculate nhood enrichment
     sq.gr.spatial_neighbors(adata, coord_type="generic")
     sq.gr.nhood_enrichment(adata, cluster_key="maxScores")
+    sq.gr.nhood_enrichment(adata, cluster_key="clean_celltypes")
     return adata
 
 
-def enrichment_plot(adata: AnnData, output: str = None) -> None:
+def enrichment_plot(
+    adata: AnnData, 
+    clean: bool = True,
+    output: str = None) -> None:
     """This function plots the nhood enrichment between different celltypes."""
+
+    if clean:
+        key = "clean_celltypes"
+    else:
+        key = "maxScores"
 
     # disable interactive mode
     if output:
         plt.ioff()
 
     # remove 'nan' values from "adata.uns['maxScores_nhood_enrichment']['zscore']"
-    tmp = adata.uns['maxScores_nhood_enrichment']['zscore']
-    adata.uns['maxScores_nhood_enrichment']['zscore'] = np.nan_to_num(tmp)
-    sq.pl.nhood_enrichment(adata, cluster_key="maxScores", method="ward")
+    tmp = adata.uns[key + '_nhood_enrichment']['zscore']
+    adata.uns[key + '_nhood_enrichment']['zscore'] = np.nan_to_num(tmp)
+    sq.pl.nhood_enrichment(adata, cluster_key=key, method="ward")
 
     # Save the plot to ouput
     if output:
         plt.savefig(output + ".png", bbox_inches="tight")
 
+def cooccurrence(
+    adata: AnnData, 
+    cluster: str, 
+    clean: bool = True) -> AnnData:
+    """
+    Returns the AnnData object.
+
+    Performs co-occurrence analysis on the cluster
+    """
+
+    if clean:
+        key = "clean_celltypes"
+    else:
+        key = "maxScores"
+
+    # Calculate co-occurrence score
+    sq.gr.co_occurrence(adata, cluster_key=key)
+    sq.pl.co_occurrence(adata, cluster_key=key, clusters=cluster)
+    # TODO: resize legend box and plot
+
+    return adata
+
+def ripley(
+    adata: AnnData, 
+    mode: str = 'L', 
+    clean: bool = True) -> AnnData:
+    """
+    Returns the AnnData object.
+
+    Calculates Ripley's L statistics on the cluster.
+    """
+
+    if clean:
+        key = "clean_celltypes"
+    else:
+        key = "maxScores"
+
+    # Calculate Ripley's statistics
+    sq.gr.ripley(adata, cluster_key=key, mode=mode)
+    sq.pl.ripley(adata, cluster_key=key, mode=mode)
+    # TODO: resize legend box and plot
+
+    return adata
+
+def spatialscatter_plot(
+    adata: AnnData, 
+    output: str = None,
+    clean:bool = True) -> None:
+    """This function plots the spatial coordinates."""
+
+    if clean:
+        key = "clean_celltypes"
+    else:
+        key = "maxScores"
+    
+    # disable interactive mode
+    if output:
+        plt.ioff()
+
+    sq.pl.spatial_scatter(adata, color=key, size=20, shape=None)
+    # TODO: resize legend box and plot
+
+    # Save the plot to ouput
+    if output:
+        plt.savefig(output + ".png", bbox_inches="tight")
 
 def save_data(adata: AnnData, output_geojson: str, output_h5ad: str):
     """Saves the ploygons to output_geojson as GeoJson object and the rest of the AnnData object to output_h5ad as h5ad file."""
@@ -1382,6 +1442,3 @@ def read_in_Vizgen(path_genes,xcol='global_x',ycol='global_y',genecol='gene',ski
         for i in filterGenes:
             in_df=in_df[in_df['gene'].str.contains(i)==False]
     return in_df
-
-
-    
