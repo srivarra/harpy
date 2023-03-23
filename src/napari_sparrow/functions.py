@@ -871,8 +871,8 @@ def filter_on_size(
     adata.obsm["polygons"]["X"] = adata.obsm["polygons"].centroid.x
     adata.obsm["polygons"]["Y"] = adata.obsm["polygons"].centroid.y
     adata.obs["distance"] = np.sqrt(
-        np.square(adata.obsm["polygons"]["X"] - adata.obsm["spatial"].iloc[:, 0])
-        + np.square(adata.obsm["polygons"]["Y"] - adata.obsm["spatial"].iloc[:, 1])
+        np.square(adata.obsm["polygons"]["X"] - adata.obsm["spatial"][:, 0])
+        + np.square(adata.obsm["polygons"]["Y"] - adata.obsm["spatial"][:, 1])
     )
 
     # Filter cells based on size and distance

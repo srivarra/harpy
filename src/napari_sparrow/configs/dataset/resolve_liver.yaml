@@ -6,3 +6,4 @@ markers: ${dataset.data_dir}/markerGeneListMartinNoLow.csv
 url: False
 sample: resolve
 offset: False
+subset: 0:2144,0:2144

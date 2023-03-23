@@ -6,3 +6,4 @@ markers: ${dataset.data_dir}/markerGenesVizgen.csv
 url: https://dl01.irc.ugent.be/spatial/vizgen/triesLotte/vizgen_Liver_polyT_45_000.zarr/
 sample: vizgen
 offset: [45000, 45000]
+subset: False
