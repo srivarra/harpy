@@ -14,25 +14,15 @@ log = utils.get_pylogger(__name__)
 def clean(cfg: DictConfig, results: dict) -> DictConfig:
     """Cleaning step, the first step of the pipeline, performs tilingCorrection and preprocessing of the image to improve image quality."""
 
+    # Read in the image, load into ImageContainer
+    img = io.imread(cfg.dataset.image)
+    ic = sq.ImageContainer(img)
+
     # Image subset for faster processing
     left_corner, size = None, None
-    if cfg.dataset.subset:
-        left_corner, size = utils.parse_subset(cfg.dataset.subset)
-        log.info(f"Subset is {str(cfg.dataset.subset)}")
-
-    # Read in the xarray image with url
-    if cfg.dataset.url and cfg.dataset.dtype == 'xarray':
-        subset = None
-        if cfg.dataset.subset:
-            subset = [left_corner[0], left_corner[0]+size[0], 
-                      left_corner[1], left_corner[1]+size[1]]
-        ic = fc.read_in_zarr(cfg.dataset.url, subset=subset)
-        img = ic.data.image.squeeze().to_numpy()
-    
-    # Read in the image, load into ImageContainer
-    else:    
-        img = io.imread(cfg.dataset.image)
-        ic = sq.ImageContainer(img)
+    if cfg.subset:
+        left_corner, size = utils.parse_subset(cfg.subset)
+        log.info(f"Subset is {str(cfg.subset)}")
 
     # Perform tilingCorrection on the whole image, corrects illumination and performs inpainting
     if cfg.clean.tilingCorrection:
@@ -96,9 +86,6 @@ def segment(cfg: DictConfig, results: dict) -> DictConfig:
         cfg.segmentation.channels,
     )
 
-    if cfg.segmentation.small_size_vis:
-        small_size_vis=fc.small_size_vis_check(img=img, small_size_vis=cfg.segmentation.small_size_vis)
-
     # Write plot to given path if output is enabled
     if "segmentation" in cfg.paths:
         log.info(f"Writing segmentation plots to {cfg.paths.segmentation}")
@@ -107,7 +94,7 @@ def segment(cfg: DictConfig, results: dict) -> DictConfig:
             masks_i,
             polygons,
             channels=cfg.segmentation.channels,
-            small_size_vis=small_size_vis,
+            small_size_vis=cfg.segmentation.small_size_vis,
             output=cfg.paths.segmentation,
         )
 
@@ -130,27 +117,19 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
     img = results["preprocessimg"]
 
     # Create the adata object with from the masks and the transcripts
-    if cfg.dataset.sample == "vizgen":
-        ddf = fc.read_in_Vizgen(
-            cfg.dataset.coords, offset=cfg.dataset.offset, 
-            bbox=[-41.61239999999996,-107.97948000000231], pixelSize=0.108, filterGenes=["Blank-"]
-        )
-        adata, _ = fc.allocation(ddf, img, masks, cfg.allocate.library_id)
-
-    else:
-        adata = fc.create_adata_quick(
-            cfg.dataset.coords, img, masks, cfg.allocate.library_id
-        )
+    adata = fc.create_adata_quick(
+        cfg.dataset.coords, img, masks, cfg.allocate.library_id
+    )
 
     # Write plots to given path if output is enabled
     if "polygons" in cfg.paths:
         log.info(f"Writing polygon plot to {cfg.paths.polygons}")
         fc.plot_shapes(
-            adata=adata,
-            column=cfg.allocate.polygon_column or None,
-            cmap=cfg.allocate.polygon_cmap,
-            alpha=cfg.allocate.polygon_alpha,
-            crd=cfg.allocate.polygon_crd or None,
+            adata,
+            cfg.allocate.polygon_column or None,
+            cfg.allocate.polygon_cmap,
+            cfg.allocate.polygon_alpha,
+            cfg.allocate.polygon_crd or None,
             output=cfg.paths.polygons,
         )
 
@@ -166,11 +145,11 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
     if "total_counts" in cfg.paths:
         log.info(f"Writing total count plot to {cfg.paths.total_counts}")
         fc.plot_shapes(
-            adata=adata,
-            column=cfg.allocate.total_counts_column or None,
-            cmap=cfg.allocate.total_counts_cmap,
-            alpha=cfg.allocate.total_counts_alpha,
-            crd=cfg.allocate.total_counts_crd or None,
+            adata,
+            cfg.allocate.total_counts_column or None,
+            cfg.allocate.total_counts_cmap,
+            cfg.allocate.total_counts_alpha,
+            cfg.allocate.total_counts_crd or None,
             output=cfg.paths.total_counts,
         )
 
@@ -181,11 +160,11 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
     if "distance" in cfg.paths:
         log.info(f"Writing distance plot to {cfg.paths.distance}")
         fc.plot_shapes(
-            adata=adata,
-            column=cfg.allocate.distance_column or None,
-            cmap=cfg.allocate.distance_cmap,
-            alpha=cfg.allocate.distance_alpha,
-            crd=cfg.allocate.distance_crd or None,
+            adata,
+            cfg.allocate.distance_column or None,
+            cfg.allocate.distance_cmap,
+            cfg.allocate.distance_alpha,
+            cfg.allocate.distance_crd or None,
             output=cfg.paths.distance,
         )
 
@@ -207,11 +186,11 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
     if "leiden" in cfg.paths:
         log.info(f"Writing leiden plot to {cfg.paths.leiden}")
         fc.plot_shapes(
-            adata=adata,
-            column=cfg.allocate.leiden_column or None,
-            cmap=cfg.allocate.leiden_cmap,
-            alpha=cfg.allocate.leiden_alpha,
-            crd=cfg.allocate.leiden_crd or None,
+            adata,
+            cfg.allocate.leiden_column or None,
+            cfg.allocate.leiden_cmap,
+            cfg.allocate.leiden_alpha,
+            cfg.allocate.leiden_crd or None,
             output=cfg.paths.leiden,
         )
 
@@ -280,12 +259,11 @@ def visualize(cfg: DictConfig, results: dict) -> DictConfig:
         )
     # Calculate nhood enrichement
     adata = fc.enrichment(adata)
-    fc.save_data(adata, cfg.paths.geojson, cfg.paths.h5ad)
     if "nhood" in cfg.paths:
         fc.enrichment_plot(adata, cfg.paths.nhood)
 
     # Save polygons to geojson and adata to h5ad files
-    # fc.save_data(adata, cfg.paths.geojson, cfg.paths.h5ad)
+    fc.save_data(adata, cfg.paths.geojson, cfg.paths.h5ad)
 
     log.info("Pipeline finished")
     return cfg, results

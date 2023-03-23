@@ -1,8 +1,0 @@
-# @package dataset
-
-defaults:
-- resolve_liver
-
-image: ${dataset.data_dir}/20272_slide1_D2-2_DAPI.tiff
-coords: ${dataset.data_dir}/20272_slide1_D2-2_results.txt
-

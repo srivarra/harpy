@@ -1,7 +1,0 @@
-# @package segmentation
-
-defaults:
-- cellpose
-
-flow_threshold: 0.9
-cellprob_threshold: -4

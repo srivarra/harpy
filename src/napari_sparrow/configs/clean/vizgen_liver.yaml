@@ -1,9 +1,0 @@
-# @package clean
-
-defaults:
-- default
-
-tilingCorrection: False
-tile_size: False
-size_tophat: 135
-contrast_clip: 18.5
