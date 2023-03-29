@@ -727,7 +727,7 @@ def plot_shapes(
     
     if img==None:
         img= sq.im.ImageContainer(adata.uns["spatial"][library_id]["images"]["hires"], layer="image")
-        
+
     Xmax=img.data.sizes['x']
     Ymax=img.data.sizes['y']    
     img=img.data.assign_coords({'x':np.arange(Xmax),'y':np.arange(Ymax)})  
@@ -742,6 +742,11 @@ def plot_shapes(
                 adata.uns[column + "_colors"],
                 N=len(adata.uns[column + "_colors"]),
             ) 
+
+        # When crd does not contain any polygons.
+        if adata.obsm["polygons"].cx[crd[0]:crd[1],crd[2]:crd[3]].empty:
+            crd=[0,Xmax,0,Ymax]
+
         if column in adata.obs.columns:    
             column=adata[adata.obsm["polygons"].cx[crd[0]:crd[1],crd[2]:crd[3]].index,:].obs[column]
         elif column in adata.var.index:
@@ -1179,7 +1184,6 @@ def clustercleanliness(
 
 def clustercleanlinessPlot(
     adata: AnnData,
-    color_dict: dict,
     crop_coord: List[int] = [0, 2000, 0, 2000],
     clean: bool = True,
     output: str = None,
@@ -1228,6 +1232,8 @@ def clustercleanlinessPlot(
     plot_shapes(
         adata, column=color, alpha=0.8, output=output + "1" if output else None, library_id=library_id
     )
+
+    # Plot small images
     plot_shapes(
         adata,
         column=color,
