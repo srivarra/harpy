@@ -1,3 +1,4 @@
+method: "cellpose"
 _target_: napari_sparrow.widgets._segment_widget.create_cellpose_method
 min_size: 80
 flow_threshold: 0.8

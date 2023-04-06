@@ -1,0 +1,9 @@
+data_dir: ${paths.data_dir}/vizgen_liver/
+dtype: xarray
+image: False
+coords: ${dataset.data_dir}/detected_transcripts.csv
+markers: ${dataset.data_dir}/markerGenesVizgen.csv
+url: https://dl01.irc.ugent.be/spatial/vizgen/triesLotte/vizgen_Liver_DAPI_0.zarr/
+sample: vizgen
+offset: [45000, 45000]
+subset: 0:45000,0:45000

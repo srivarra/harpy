@@ -1,0 +1,6 @@
+# @package segmentation
+
+defaults:
+- baysor
+
+data: ${segmentation.adata_dir}/20272_slide1_A1-1/

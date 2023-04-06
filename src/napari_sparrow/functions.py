@@ -1448,3 +1448,23 @@ def read_in_Vizgen(path_genes,xcol='global_x',ycol='global_y',genecol='gene',ski
         for i in filterGenes:
             in_df=in_df[in_df['gene'].str.contains(i)==False]
     return in_df
+
+
+def load_masks_from_adata(
+        path: str, 
+        img: sq.im.ImageContainer):
+    
+    path_h5ad = path + "adata.h5ad"
+    path_geojson = path + "adata.geojson"
+    
+    adata = sc.read(path_h5ad)
+    masks = adata.uns["spatial"]["melanoma"]["segmentation"].astype(np.uint16)
+    mask_i = np.ma.masked_where(masks == 0, masks)
+    polygons = geopandas.read_file(path_geojson)
+    polygons["linewidth"] = polygons.geometry.map(linewidth)
+    polygons["cells"] = polygons.index
+    polygons = polygons.dissolve(by="cells")
+
+    img.add_img(masks, layer="segment_cellpose")
+
+    return masks, mask_i, polygons, img

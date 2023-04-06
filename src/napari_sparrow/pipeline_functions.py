@@ -13,7 +13,7 @@ log = utils.get_pylogger(__name__)
 
 def clean(cfg: DictConfig, results: dict) -> DictConfig:
     """Cleaning step, the first step of the pipeline, performs tilingCorrection and preprocessing of the image to improve image quality."""
-
+    
     # Image subset for faster processing
     left_corner, size = None, None
     if cfg.dataset.subset:
@@ -85,19 +85,24 @@ def segment(cfg: DictConfig, results: dict) -> DictConfig:
     img = ic.data.image.squeeze().to_numpy()
 
     # Perform segmentation
-    masks, masks_i, polygons, ic = fc.segmentation(
-        ic,
-        cfg.device,
-        cfg.segmentation.min_size,
-        cfg.segmentation.flow_threshold,
-        cfg.segmentation.diameter,
-        cfg.segmentation.cellprob_threshold,
-        cfg.segmentation.model_type,
-        cfg.segmentation.channels,
-    )
+    if cfg.segmentation.method == 'baysor':
+        masks, masks_i, polygons, ic = fc.load_masks_from_adata(cfg.segmentation.data, ic)
+
+    else:
+        masks, masks_i, polygons, ic = fc.segmentation(
+            ic,
+            cfg.device,
+            cfg.segmentation.min_size,
+            cfg.segmentation.flow_threshold,
+            cfg.segmentation.diameter,
+            cfg.segmentation.cellprob_threshold,
+            cfg.segmentation.model_type,
+            cfg.segmentation.channels,
+        )
 
     if cfg.segmentation.small_size_vis:
         small_size_vis=fc.small_size_vis_check(img=img, small_size_vis=cfg.segmentation.small_size_vis)
+
 
     # Write plot to given path if output is enabled
     if "segmentation" in cfg.paths:
@@ -275,7 +280,6 @@ def visualize(cfg: DictConfig, results: dict) -> DictConfig:
         fc.clustercleanlinessPlot(
             adata,
             cfg.visualize.crd,
-            color_dict,
             output=cfg.paths.cluster_cleanliness,
         )
     # Calculate nhood enrichement
@@ -288,4 +292,5 @@ def visualize(cfg: DictConfig, results: dict) -> DictConfig:
     # fc.save_data(adata, cfg.paths.geojson, cfg.paths.h5ad)
 
     log.info("Pipeline finished")
+
     return cfg, results

@@ -1,0 +1,5 @@
+method: "baysor"
+adata_dir: ${paths.data_dir}/resolve_liver/baysor
+data: ${segmentation.adata_dir}/20272_slide1_A1-1/
+channels: [0,0]
+small_size_vis: [3000, 6000, 5000, 9000]
