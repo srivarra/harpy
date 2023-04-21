@@ -554,7 +554,7 @@ def delete_overlap(voronoi,polygons):
     return voronoi
 
 
-def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id: str = "spatial_transcriptomics",radius=0,polygons=None, verbose=False
+def create_adata_quick_Vizgen(ddf, path: str or None, ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id: str = "melanoma",radius=0,polygons=None, verbose=False
     ):
     
     # Create the polygon shapes for the mask
@@ -581,20 +581,33 @@ def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id:
         masks=rasterio.features.rasterize( #it should be possible to give every shape  number. You need to give the value with it as input. 
             zip(buffered.geometry,buffered.index.values.astype(float)), 
             out_shape=[ic.shape[0],ic.shape[1]],dtype='uint32')    
-        
-    # adapt transcripts file     
-    ddf = ddf[
-    (ic.data.attrs["coords"].y0 < ddf['y'])
-    & (ddf['y'] < masks.shape[0] + ic.data.attrs["coords"].y0)
-    & (ic.data.attrs["coords"].x0 < ddf['x'])
-    & (ddf['x'] < masks.shape[1] + ic.data.attrs["coords"].x0)
-    ]
-    if verbose:
-        print('Started df calculation')
+    
+    if path is None:
+        # adapt transcripts file     
+        ddf = ddf[
+        (ic.data.attrs["coords"].y0 < ddf['y'])
+        & (ddf['y'] < masks.shape[0] + ic.data.attrs["coords"].y0)
+        & (ic.data.attrs["coords"].x0 < ddf['x'])
+        & (ddf['x'] < masks.shape[1] + ic.data.attrs["coords"].x0)
+        ]
+        if verbose:
+            print('Started df calculation')
 
-    df=ddf.compute()
-    if verbose:
-        print('df calculated')
+        df=ddf.compute()
+        if verbose:
+            print('df calculated')
+    
+    else:
+        # read in re-scaled transcript coordinates
+        in_df = pd.read_csv(path, delimiter=",", index_col=0)
+        # Changed for subset
+        df = in_df[
+            (ic.data.attrs["coords"].y0 < in_df['y'])
+            & (in_df['y'] < masks.shape[0] + ic.data.attrs["coords"].y0)
+            & (ic.data.attrs["coords"].x0 < in_df['x'])
+            & (in_df['x'] < masks.shape[1] + ic.data.attrs["coords"].x0)
+        ]
+    
     df["cells"] = masks[
         df['y'].values.astype(int) - ic.data.attrs["coords"].y0,
         df['x'].values.astype(int) - ic.data.attrs["coords"].x0,
@@ -634,7 +647,7 @@ def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id:
     }
     #adata.uns["spatial"][library_id]["segmentation"] = masks.astype(np.uint16)
 
-    return adata,df
+    return adata, df
 
 
 def create_adata_quick(

@@ -53,6 +53,10 @@ def clean(cfg: DictConfig, results: dict) -> DictConfig:
             )
         ic = ic_correct
 
+    else:
+        if size is not None and left_corner is not None:
+            ic = ic.crop_corner(*left_corner, size)
+
     # Preprocess image, apply tophat filter if supplied and CLAHE contrast function
     ic_preprocess = fc.preprocessImage(
         img=ic,
@@ -147,12 +151,20 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
 
     # Create the adata object with from the masks and the transcripts
     if cfg.dataset.sample == "vizgen":
+        path = None
+        ddf = None
 
-        ddf = fc.read_in_Vizgen(
-            cfg.dataset.coords, offset=cfg.dataset.offset, 
-            bbox=[-41.61239999999996,-107.97948000000231], pixelSize=0.108, filterGenes=["Blank-"]
-        )
-        adata, _ = fc.allocation(ddf, img, masks, cfg.allocate.library_id)
+        # check whether given csv file of transcript coordinates has been re-scaled to pixel value
+        if cfg.dataset.re_scaled:
+            path = cfg.dataset.coords
+
+        else:
+            ddf = fc.read_in_Vizgen(
+                cfg.dataset.coords, offset=cfg.dataset.offset, 
+                bbox=[-41.61239999999996,-107.97948000000231], pixelSize=0.108, filterGenes=["Blank-"]
+            )
+        
+        adata, _ = fc.create_adata_quick_Vizgen(ddf, path, img, masks, cfg.allocate.library_id)
 
     else:
         adata = fc.create_adata_quick(
