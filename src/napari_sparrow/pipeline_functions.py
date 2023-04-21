@@ -94,7 +94,7 @@ def segment(cfg: DictConfig, results: dict) -> DictConfig:
         
         # Load masks.npy file if given
         if cfg.segmentation.masks:
-            masks = np.laod(cfg.segmentation.masks)
+            masks = np.load(cfg.segmentation.masks)
 
         _, masks, masks_i, polygons, ic = fc.load_polygons_from_adata(
                                             cfg.segmentation.data, 

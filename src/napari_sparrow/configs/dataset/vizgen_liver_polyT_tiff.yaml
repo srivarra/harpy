@@ -6,5 +6,5 @@ markers: ${dataset.data_dir}/markerGenesVizgen.csv
 url: False
 sample: vizgen
 offset: False
-subset: 0:2000,0:2000
+subset: 0:10000,0:10000
 re_scaled: True

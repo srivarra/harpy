@@ -4,8 +4,10 @@ defaults:
 - existing_anndata
 
 method: "cellpose"
-data: ${segmentation.adata_dir}/cellpose_polyT/
+# data: ${segmentation.adata_dir}/cellpose_polyT/
+data: /data/gent/vo/000/gvo00095/Courses/AHTA/DaMBi_lab/napari-sparrow/results/vizgen_liver/2023-04-20_19-11-04_polyT_cellpose_10_000/
 adata_dir: ${paths.data_dir}/vizgen_liver
-masks: ${segmentation.adata_dir}/cellpose_polyT/masks.npy
+# masks: ${segmentation.adata_dir}/cellpose_polyT/masks.npy
+masks: /data/gent/vo/000/gvo00095/Courses/AHTA/DaMBi_lab/napari-sparrow/results/vizgen_liver/2023-04-20_19-11-04_polyT_cellpose_10_000/masks.npy
 channels: [1, 0]
 library_id: 'liver'
