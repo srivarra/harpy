@@ -85,7 +85,7 @@ def segment(cfg: DictConfig, results: dict) -> DictConfig:
     img = ic.data.image.squeeze().to_numpy()
 
     # Perform segmentation
-    if cfg.segmentation.method == 'baysor':
+    if cfg.segmentation.masks:
         masks, masks_i, polygons, ic = fc.load_masks_from_adata(cfg.segmentation.data, ic)
 
     else:
@@ -156,6 +156,7 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
             cmap=cfg.allocate.polygon_cmap,
             alpha=cfg.allocate.polygon_alpha,
             crd=cfg.allocate.polygon_crd or None,
+            library_id=cfg.allocate.library_id,
             output=cfg.paths.polygons,
         )
 
@@ -176,6 +177,7 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
             cmap=cfg.allocate.total_counts_cmap,
             alpha=cfg.allocate.total_counts_alpha,
             crd=cfg.allocate.total_counts_crd or None,
+            library_id=cfg.allocate.library_id,
             output=cfg.paths.total_counts,
         )
 
@@ -191,6 +193,7 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
             cmap=cfg.allocate.distance_cmap,
             alpha=cfg.allocate.distance_alpha,
             crd=cfg.allocate.distance_crd or None,
+            library_id=cfg.allocate.library_id,
             output=cfg.paths.distance,
         )
 
@@ -217,6 +220,7 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
             cmap=cfg.allocate.leiden_cmap,
             alpha=cfg.allocate.leiden_alpha,
             crd=cfg.allocate.leiden_crd or None,
+            library_id=cfg.allocate.library_id,
             output=cfg.paths.leiden,
         )
 
@@ -244,7 +248,7 @@ def annotate(cfg: DictConfig, results: dict) -> DictConfig:
 
     # Write plot to given path if output is enabled
     if "score_genes" in cfg.paths:
-        fc.scoreGenesPlot(adata, scoresper_cluster, output=cfg.paths.score_genes)
+        fc.scoreGenesPlot(adata, scoresper_cluster, library_id=cfg.allocate.library_id, output=cfg.paths.score_genes)
 
     # Perform correction for genes that occur in all cells and are overexpressed
     if "marker_genes" in cfg.annotate:
@@ -280,6 +284,7 @@ def visualize(cfg: DictConfig, results: dict) -> DictConfig:
         fc.clustercleanlinessPlot(
             adata,
             cfg.visualize.crd,
+            library_id=cfg.allocate.library_id,
             output=cfg.paths.cluster_cleanliness,
         )
     # Calculate nhood enrichement

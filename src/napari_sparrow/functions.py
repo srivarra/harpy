@@ -560,6 +560,7 @@ def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id:
     # Create the polygon shapes for the mask
     if polygons is None:
         polygons = mask_to_polygons_layer(masks)
+        polygons.index = list(map(np.uint32, polygons.index))
         polygons["cells"] = polygons.index
         polygons = polygons.dissolve(by="cells")
     polygons.index = list(map(str, polygons.index))
@@ -600,23 +601,23 @@ def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id:
     ]
     if masks is None:
         masks=ic.data.segment_cellpose.squeeze().to_numpy()
+
     # Calculate the mean of the transcripts for every cell
     coordinates = df.groupby(["cells"]).mean().loc[:, ['x', 'y']]
     cell_counts = df.groupby(["cells", "gene"]).size().unstack(fill_value=0)
-    # print('finished groupbe')
+    
     # Create the anndata object
     adata = AnnData(cell_counts[cell_counts.index != 0])
     coordinates.index = coordinates.index.map(str)
     adata.obsm["spatial"] = coordinates[coordinates.index != "0"].values
     if verbose:
         print('created anndata object')
+
     # Add the polygons to the anndata object
     polygons["linewidth"] = polygons.geometry.map(linewidth)
-
     polygons_f = polygons[
         np.isin(polygons.index.values, adata.obs.index.values)
     ]
-    #polygons_f.index = list(map(str, polygons_f.index))
     adata.obsm["polygons"] = polygons_f
     adata.obs["cell_ID"] = [int(x) for x in adata.obsm["polygons"].index]
 
@@ -1458,7 +1459,7 @@ def load_masks_from_adata(
     path_geojson = path + "adata.geojson"
     
     adata = sc.read(path_h5ad)
-    masks = adata.uns["spatial"]["melanoma"]["segmentation"].astype(np.uint16)
+    masks = adata.uns["spatial"]["melanoma"]["segmentation"]
     mask_i = np.ma.masked_where(masks == 0, masks)
     polygons = geopandas.read_file(path_geojson)
     polygons["linewidth"] = polygons.geometry.map(linewidth)

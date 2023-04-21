@@ -3,6 +3,7 @@
 data
 spatial
 logs
+results
 .env
 .autoenv
 

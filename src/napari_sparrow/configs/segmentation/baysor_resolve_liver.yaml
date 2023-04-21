@@ -1,6 +1,6 @@
 # @package segmentation
 
 defaults:
-- baysor
+- existing_masks
 
 data: ${segmentation.adata_dir}/20272_slide1_A1-1/

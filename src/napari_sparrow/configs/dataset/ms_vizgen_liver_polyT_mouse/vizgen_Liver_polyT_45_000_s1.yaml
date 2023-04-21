@@ -1,6 +1,6 @@
 # @package dataset
 
 defaults:
-- vizgen_liver
+- vizgen_liver_polyT
 
 subset: 0:20000,0:20000

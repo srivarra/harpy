@@ -1,6 +1,0 @@
-# @package dataset
-
-defaults:
-- vizgen_liver
-
-subset: 20000:40000,0:20000

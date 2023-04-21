@@ -6,4 +6,4 @@ markers: ${dataset.data_dir}/markerGenesVizgen.csv
 url: https://dl01.irc.ugent.be/spatial/vizgen/triesLotte/vizgen_Liver_DAPI_0.zarr/
 sample: vizgen
 offset: [45000, 45000]
-subset: 0:45000,0:45000
+subset: 45000:55000,45000:55000
