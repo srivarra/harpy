@@ -701,7 +701,8 @@ def create_adata_quick(
         "tissue_hires_scalef": 1,
         "spot_diameter_fullres": 75,
     }
-    adata.uns["spatial"][library_id]["segmentation"] = masks.astype(np.uint16)
+    dtype_masks = masks.dtype
+    adata.uns["spatial"][library_id]["segmentation"] = masks.astype(dtype_masks)
     adata.uns["spatial"][library_id]["points"] = AnnData(in_df.values[:, 0:2])
     adata.uns["spatial"][library_id]["points"].obs = pd.DataFrame(
         {"gene": in_df.values[:, 3]}
@@ -1451,21 +1452,31 @@ def read_in_Vizgen(path_genes,xcol='global_x',ycol='global_y',genecol='gene',ski
     return in_df
 
 
-def load_masks_from_adata(
+def load_polygons_from_adata(
         path: str, 
-        img: sq.im.ImageContainer):
+        img: sq.im.ImageContainer,
+        masks: None,
+        library_id: str = 'melanoma',
+        ):
     
     path_h5ad = path + "adata.h5ad"
     path_geojson = path + "adata.geojson"
     
     adata = sc.read(path_h5ad)
-    masks = adata.uns["spatial"]["melanoma"]["segmentation"]
+
+    if masks is None:
+        masks = adata.uns["spatial"][library_id]["segmentation"]
+    else:
+        adata.uns["spatial"][library_id]["segmentation"] = masks
+    
     mask_i = np.ma.masked_where(masks == 0, masks)
     polygons = geopandas.read_file(path_geojson)
     polygons["linewidth"] = polygons.geometry.map(linewidth)
     polygons["cells"] = polygons.index
-    polygons = polygons.dissolve(by="cells")
-
+    # polygons = polygons.dissolve(by="cells")
+    
     img.add_img(masks, layer="segment_cellpose")
+    
+    adata.obsm["polygons"] = polygons.set_index('index')
 
-    return masks, mask_i, polygons, img
+    return adata, masks, mask_i, polygons, img

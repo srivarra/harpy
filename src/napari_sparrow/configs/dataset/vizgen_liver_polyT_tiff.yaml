@@ -1,0 +1,9 @@
+data_dir: ${paths.data_dir}/vizgen_liver
+dtype: tiff
+image: ${dataset.data_dir}/vizgen_Liver_polyT_45_000.tiff
+coords: ${dataset.data_dir}/detected_transcripts_40_000.csv
+markers: ${dataset.data_dir}/markerGenesVizgen.csv
+url: False
+sample: vizgen
+offset: False
+subset: 0:40000,0:40000

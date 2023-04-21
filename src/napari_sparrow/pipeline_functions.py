@@ -85,8 +85,19 @@ def segment(cfg: DictConfig, results: dict) -> DictConfig:
     img = ic.data.image.squeeze().to_numpy()
 
     # Perform segmentation
-    if cfg.segmentation.masks:
-        masks, masks_i, polygons, ic = fc.load_masks_from_adata(cfg.segmentation.data, ic)
+    if cfg.segmentation.adata:
+        masks = None
+        
+        # Load masks.npy file if given
+        if cfg.segmentation.masks:
+            masks = np.laod(cfg.segmentation.masks)
+
+        _, masks, masks_i, polygons, ic = fc.load_polygons_from_adata(
+                                            cfg.segmentation.data, 
+                                            ic, 
+                                            masks, 
+                                            library_id=cfg.segmentation.library_id
+                                          )
 
     else:
         masks, masks_i, polygons, ic = fc.segmentation(
@@ -136,6 +147,7 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
 
     # Create the adata object with from the masks and the transcripts
     if cfg.dataset.sample == "vizgen":
+
         ddf = fc.read_in_Vizgen(
             cfg.dataset.coords, offset=cfg.dataset.offset, 
             bbox=[-41.61239999999996,-107.97948000000231], pixelSize=0.108, filterGenes=["Blank-"]

@@ -1,8 +1,11 @@
 # @package segmentation
 
 defaults:
-- existing_masks
+- existing_anndata
 
 method: "cellpose"
 data: ${segmentation.adata_dir}/cellpose_polyT/
 adata_dir: ${paths.data_dir}/vizgen_liver
+masks: ${segmentation.adata_dir}/cellpose_polyT/masks.npy
+channels: [1, 0]
+library_id: 'liver'

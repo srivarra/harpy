@@ -6,5 +6,3 @@ defaults:
 flow_threshold: 0.85
 diameter: 100
 cellprob_threshold: -4
-model_type: "nuclei"
-channels: [0, 0]
