@@ -1,0 +1,6 @@
+# @package dataset
+
+defaults:
+- vizgen_liver_DAPI
+
+subset: 45000:65000,45000:65000

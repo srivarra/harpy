@@ -1,0 +1,7 @@
+# @package segmentation
+
+defaults:
+- existing_anndata
+
+data: ${segmentation.adata_dir}/20272_slide1_A1-1/
+library_id: 'liver'

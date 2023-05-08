@@ -13,7 +13,7 @@ log = utils.get_pylogger(__name__)
 
 def clean(cfg: DictConfig, results: dict) -> DictConfig:
     """Cleaning step, the first step of the pipeline, performs tilingCorrection and preprocessing of the image to improve image quality."""
-
+    
     # Image subset for faster processing
     left_corner, size = None, None
     if cfg.dataset.subset:
@@ -53,6 +53,10 @@ def clean(cfg: DictConfig, results: dict) -> DictConfig:
             )
         ic = ic_correct
 
+    else:
+        if size is not None and left_corner is not None:
+            ic = ic.crop_corner(*left_corner, size)
+
     # Preprocess image, apply tophat filter if supplied and CLAHE contrast function
     ic_preprocess = fc.preprocessImage(
         img=ic,
@@ -85,19 +89,35 @@ def segment(cfg: DictConfig, results: dict) -> DictConfig:
     img = ic.data.image.squeeze().to_numpy()
 
     # Perform segmentation
-    masks, masks_i, polygons, ic = fc.segmentation(
-        ic,
-        cfg.device,
-        cfg.segmentation.min_size,
-        cfg.segmentation.flow_threshold,
-        cfg.segmentation.diameter,
-        cfg.segmentation.cellprob_threshold,
-        cfg.segmentation.model_type,
-        cfg.segmentation.channels,
-    )
+    if cfg.segmentation.adata:
+        masks = None
+        
+        # Load masks.npy file if given
+        if cfg.segmentation.masks:
+            masks = np.load(cfg.segmentation.masks)
+
+        _, masks, masks_i, polygons, ic = fc.load_polygons_from_adata(
+                                            cfg.segmentation.data, 
+                                            ic, 
+                                            masks, 
+                                            library_id=cfg.segmentation.library_id
+                                          )
+
+    else:
+        masks, masks_i, polygons, ic = fc.segmentation(
+            ic,
+            cfg.device,
+            cfg.segmentation.min_size,
+            cfg.segmentation.flow_threshold,
+            cfg.segmentation.diameter,
+            cfg.segmentation.cellprob_threshold,
+            cfg.segmentation.model_type,
+            cfg.segmentation.channels,
+        )
 
     if cfg.segmentation.small_size_vis:
         small_size_vis=fc.small_size_vis_check(img=img, small_size_vis=cfg.segmentation.small_size_vis)
+
 
     # Write plot to given path if output is enabled
     if "segmentation" in cfg.paths:
@@ -131,11 +151,20 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
 
     # Create the adata object with from the masks and the transcripts
     if cfg.dataset.sample == "vizgen":
-        ddf = fc.read_in_Vizgen(
-            cfg.dataset.coords, offset=cfg.dataset.offset, 
-            bbox=[-41.61239999999996,-107.97948000000231], pixelSize=0.108, filterGenes=["Blank-"]
-        )
-        adata, _ = fc.allocation(ddf, img, masks, cfg.allocate.library_id)
+        path = None
+        ddf = None
+
+        # check whether given csv file of transcript coordinates has been re-scaled to pixel value
+        if cfg.dataset.re_scaled:
+            path = cfg.dataset.coords
+
+        else:
+            ddf = fc.read_in_Vizgen(
+                cfg.dataset.coords, offset=cfg.dataset.offset, 
+                bbox=[-41.61239999999996,-107.97948000000231], pixelSize=0.108, filterGenes=["Blank-"]
+            )
+        
+        adata, _ = fc.create_adata_quick_Vizgen(ddf, path, img, masks, cfg.allocate.library_id)
 
     else:
         adata = fc.create_adata_quick(
@@ -151,6 +180,7 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
             cmap=cfg.allocate.polygon_cmap,
             alpha=cfg.allocate.polygon_alpha,
             crd=cfg.allocate.polygon_crd or None,
+            library_id=cfg.allocate.library_id,
             output=cfg.paths.polygons,
         )
 
@@ -171,6 +201,7 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
             cmap=cfg.allocate.total_counts_cmap,
             alpha=cfg.allocate.total_counts_alpha,
             crd=cfg.allocate.total_counts_crd or None,
+            library_id=cfg.allocate.library_id,
             output=cfg.paths.total_counts,
         )
 
@@ -186,6 +217,7 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
             cmap=cfg.allocate.distance_cmap,
             alpha=cfg.allocate.distance_alpha,
             crd=cfg.allocate.distance_crd or None,
+            library_id=cfg.allocate.library_id,
             output=cfg.paths.distance,
         )
 
@@ -212,6 +244,7 @@ def allocate(cfg: DictConfig, results: dict) -> DictConfig:
             cmap=cfg.allocate.leiden_cmap,
             alpha=cfg.allocate.leiden_alpha,
             crd=cfg.allocate.leiden_crd or None,
+            library_id=cfg.allocate.library_id,
             output=cfg.paths.leiden,
         )
 
@@ -239,7 +272,7 @@ def annotate(cfg: DictConfig, results: dict) -> DictConfig:
 
     # Write plot to given path if output is enabled
     if "score_genes" in cfg.paths:
-        fc.scoreGenesPlot(adata, scoresper_cluster, output=cfg.paths.score_genes)
+        fc.scoreGenesPlot(adata, scoresper_cluster, library_id=cfg.allocate.library_id, output=cfg.paths.score_genes)
 
     # Perform correction for genes that occur in all cells and are overexpressed
     if "marker_genes" in cfg.annotate:
@@ -275,7 +308,7 @@ def visualize(cfg: DictConfig, results: dict) -> DictConfig:
         fc.clustercleanlinessPlot(
             adata,
             cfg.visualize.crd,
-            color_dict,
+            library_id=cfg.allocate.library_id,
             output=cfg.paths.cluster_cleanliness,
         )
     # Calculate nhood enrichement
@@ -288,4 +321,5 @@ def visualize(cfg: DictConfig, results: dict) -> DictConfig:
     # fc.save_data(adata, cfg.paths.geojson, cfg.paths.h5ad)
 
     log.info("Pipeline finished")
+
     return cfg, results

@@ -555,12 +555,13 @@ def delete_overlap(voronoi,polygons):
     return voronoi
 
 
-def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id: str = "spatial_transcriptomics",radius=0,polygons=None, verbose=False
+def create_adata_quick_Vizgen(ddf, path: str or None, ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id: str = "melanoma",radius=0,polygons=None, verbose=False
     ):
     
     # Create the polygon shapes for the mask
     if polygons is None:
         polygons = mask_to_polygons_layer(masks)
+        polygons.index = list(map(np.uint32, polygons.index))
         polygons["cells"] = polygons.index
         polygons = polygons.dissolve(by="cells")
     polygons.index = list(map(str, polygons.index))
@@ -581,43 +582,56 @@ def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id:
         masks=rasterio.features.rasterize( #it should be possible to give every shape  number. You need to give the value with it as input. 
             zip(buffered.geometry,buffered.index.values.astype(float)), 
             out_shape=[ic.shape[0],ic.shape[1]],dtype='uint32')    
-        
-    # adapt transcripts file     
-    ddf = ddf[
-    (ic.data.attrs["coords"].y0 < ddf['y'])
-    & (ddf['y'] < masks.shape[0] + ic.data.attrs["coords"].y0)
-    & (ic.data.attrs["coords"].x0 < ddf['x'])
-    & (ddf['x'] < masks.shape[1] + ic.data.attrs["coords"].x0)
-    ]
-    if verbose:
-        print('Started df calculation')
+    
+    if path is None:
+        # adapt transcripts file     
+        ddf = ddf[
+        (ic.data.attrs["coords"].y0 < ddf['y'])
+        & (ddf['y'] < masks.shape[0] + ic.data.attrs["coords"].y0)
+        & (ic.data.attrs["coords"].x0 < ddf['x'])
+        & (ddf['x'] < masks.shape[1] + ic.data.attrs["coords"].x0)
+        ]
+        if verbose:
+            print('Started df calculation')
 
-    df=ddf.compute()
-    if verbose:
-        print('df calculated')
+        df=ddf.compute()
+        if verbose:
+            print('df calculated')
+    
+    else:
+        # read in re-scaled transcript coordinates
+        in_df = pd.read_csv(path, delimiter=",", index_col=0)
+        # Changed for subset
+        df = in_df[
+            (ic.data.attrs["coords"].y0 < in_df['y'])
+            & (in_df['y'] < masks.shape[0] + ic.data.attrs["coords"].y0)
+            & (ic.data.attrs["coords"].x0 < in_df['x'])
+            & (in_df['x'] < masks.shape[1] + ic.data.attrs["coords"].x0)
+        ]
+    
     df["cells"] = masks[
         df['y'].values.astype(int) - ic.data.attrs["coords"].y0,
         df['x'].values.astype(int) - ic.data.attrs["coords"].x0,
     ]
     if masks is None:
         masks=ic.data.segment_cellpose.squeeze().to_numpy()
+
     # Calculate the mean of the transcripts for every cell
     coordinates = df.groupby(["cells"]).mean().loc[:, ['x', 'y']]
     cell_counts = df.groupby(["cells", "gene"]).size().unstack(fill_value=0)
-    # print('finished groupbe')
+    
     # Create the anndata object
     adata = AnnData(cell_counts[cell_counts.index != 0])
     coordinates.index = coordinates.index.map(str)
     adata.obsm["spatial"] = coordinates[coordinates.index != "0"].values
     if verbose:
         print('created anndata object')
+
     # Add the polygons to the anndata object
     polygons["linewidth"] = polygons.geometry.map(linewidth)
-
     polygons_f = polygons[
         np.isin(polygons.index.values, adata.obs.index.values)
     ]
-    #polygons_f.index = list(map(str, polygons_f.index))
     adata.obsm["polygons"] = polygons_f
     adata.obs["cell_ID"] = [int(x) for x in adata.obsm["polygons"].index]
 
@@ -634,7 +648,7 @@ def allocation(ddf,ic: sq.im.ImageContainer, masks: np.ndarray=None, library_id:
     }
     #adata.uns["spatial"][library_id]["segmentation"] = masks.astype(np.uint16)
 
-    return adata,df
+    return adata, df
 
 
 def create_adata_quick(
@@ -701,7 +715,8 @@ def create_adata_quick(
         "tissue_hires_scalef": 1,
         "spot_diameter_fullres": 75,
     }
-    adata.uns["spatial"][library_id]["segmentation"] = masks.astype(np.uint16)
+    dtype_masks = masks.dtype
+    adata.uns["spatial"][library_id]["segmentation"] = masks.astype(dtype_masks)
     adata.uns["spatial"][library_id]["points"] = AnnData(in_df.values[:, 0:2])
     adata.uns["spatial"][library_id]["points"].obs = pd.DataFrame(
         {"gene": in_df.values[:, 3]}
@@ -728,7 +743,7 @@ def plot_shapes(
     
     if img==None:
         img= sq.im.ImageContainer(adata.uns["spatial"][library_id]["images"]["hires"], layer="image")
-        
+
     Xmax=img.data.sizes['x']
     Ymax=img.data.sizes['y']    
     img=img.data.assign_coords({'x':np.arange(Xmax),'y':np.arange(Ymax)})  
@@ -743,6 +758,11 @@ def plot_shapes(
                 adata.uns[column + "_colors"],
                 N=len(adata.uns[column + "_colors"]),
             ) 
+
+        # When crd does not contain any polygons.
+        if adata.obsm["polygons"].cx[crd[0]:crd[1],crd[2]:crd[3]].empty:
+            crd=[0,Xmax,0,Ymax]
+
         if column in adata.obs.columns:    
             column=adata[adata.obsm["polygons"].cx[crd[0]:crd[1],crd[2]:crd[3]].index,:].obs[column]
         elif column in adata.var.index:
@@ -872,8 +892,8 @@ def filter_on_size(
     adata.obsm["polygons"]["X"] = adata.obsm["polygons"].centroid.x
     adata.obsm["polygons"]["Y"] = adata.obsm["polygons"].centroid.y
     adata.obs["distance"] = np.sqrt(
-        np.square(adata.obsm["polygons"]["X"] - adata.obsm["spatial"].iloc[:, 0])
-        + np.square(adata.obsm["polygons"]["Y"] - adata.obsm["spatial"].iloc[:, 1])
+        np.square(adata.obsm["polygons"]["X"] - adata.obsm["spatial"][:, 0])
+        + np.square(adata.obsm["polygons"]["Y"] - adata.obsm["spatial"][:, 1])
     )
 
     # Filter cells based on size and distance
@@ -1233,6 +1253,8 @@ def clustercleanlinessPlot(
     plot_shapes(
         adata, column=color, alpha=0.8, output=output + "1" if output else None, library_id=library_id
     )
+
+    # Plot small images
     plot_shapes(
         adata,
         column=color,
@@ -1490,3 +1512,32 @@ def read_in_Vizgen(path_genes,xcol='global_x',ycol='global_y',genecol='gene',ski
         for i in filterGenes:
             in_df=in_df[in_df['gene'].str.contains(i)==False]
     return in_df
+
+def load_polygons_from_adata(
+        path: str, 
+        img: sq.im.ImageContainer,
+        masks: None,
+        library_id: str = 'melanoma',
+        ):
+    
+    path_h5ad = path + "adata.h5ad"
+    path_geojson = path + "adata.geojson"
+    
+    adata = sc.read(path_h5ad)
+
+    if masks is None:
+        masks = adata.uns["spatial"][library_id]["segmentation"]
+    else:
+        adata.uns["spatial"][library_id]["segmentation"] = masks
+    
+    mask_i = np.ma.masked_where(masks == 0, masks)
+    polygons = geopandas.read_file(path_geojson)
+    polygons["linewidth"] = polygons.geometry.map(linewidth)
+    polygons["cells"] = polygons.index
+    # polygons = polygons.dissolve(by="cells")
+    
+    img.add_img(masks, layer="segment_cellpose")
+    
+    adata.obsm["polygons"] = polygons.set_index('index')
+
+    return adata, masks, mask_i, polygons, img

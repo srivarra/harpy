@@ -1,0 +1,8 @@
+# @package allocate
+
+defaults:
+- default
+
+library_id: "liver"
+pcs: 25
+neighbors: 30

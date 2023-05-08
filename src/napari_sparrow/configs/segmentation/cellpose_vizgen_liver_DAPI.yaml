@@ -3,5 +3,6 @@
 defaults:
 - cellpose
 
-flow_threshold: 0.9
+flow_threshold: 0.85
+diameter: 100
 cellprob_threshold: -4
