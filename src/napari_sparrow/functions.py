@@ -482,6 +482,7 @@ def segmentationPlot(
             legend=True,
             aspect=1,
             )
+    
     for i in range(len(ax)):
         ax[i].axes.set_aspect('equal')
         ax[i].set_xlim(crd[2], crd[3])
@@ -1208,7 +1209,11 @@ def clustercleanlinessPlot(
     stacked_norm.columns = list(adata.obs[color].cat.categories)
     fig, ax = plt.subplots(1, 1, figsize=(10, 5))
 
-    stacked_norm.plot(kind="bar", stacked=True, ax=fig.gca())
+    if clean:
+        stacked_norm.plot(kind="bar", stacked=True, ax=fig.gca(), color=color_dict)
+    else:
+        stacked_norm.plot(kind="bar", stacked=True, ax=fig.gca())
+
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
@@ -1311,10 +1316,31 @@ def cooccurrence(
 
     # Calculate co-occurrence score
     sq.gr.co_occurrence(adata, cluster_key=key)
-    sq.pl.co_occurrence(adata, cluster_key=key, clusters=cluster)
     # TODO: resize legend box and plot
 
     return adata
+
+def cooccurrence_plot(
+    adata: AnnData, 
+    cluster: str, 
+    clean: bool = True,
+    output: str=None) -> None:
+    """This function plots the cooccurrence score of specific cell type"""
+
+    if clean:
+        key = "clean_celltypes"
+    else:
+        key = "maxScores"
+
+    # disable interactive mode
+    if output:
+        plt.ioff()
+    
+    sq.pl.co_occurrence(adata, cluster_key=key, clusters=cluster)
+
+    # Save the plot to ouput
+    if output:
+        plt.savefig(output + ".png", bbox_inches="tight")
 
 def ripley(
     adata: AnnData, 
@@ -1333,10 +1359,32 @@ def ripley(
 
     # Calculate Ripley's statistics
     sq.gr.ripley(adata, cluster_key=key, mode=mode)
-    sq.pl.ripley(adata, cluster_key=key, mode=mode)
     # TODO: resize legend box and plot
 
     return adata
+
+def ripley_plot(
+    adata: AnnData, 
+    mode: str = 'L', 
+    clean: bool = True,
+    output: str=None) -> None:
+    """This functions plots the ripley's statistics"""
+
+    if clean:
+        key = "clean_celltypes"
+    else:
+        key = "maxScores"
+
+    # disable interactive mode
+    if output:
+        plt.ioff()
+    
+    sq.pl.ripley(adata, cluster_key=key, mode=mode)
+
+    # Save the plot to ouput
+    if output:
+        plt.savefig(output + ".png", bbox_inches="tight")
+
 
 def spatialscatter_plot(
     adata: AnnData, 
