@@ -13,7 +13,7 @@ from typing import Any
 import dask.array as da
 import numpy as np
 from dask.array import Array
-from nptyping import NDArray, Shape
+from numpydantic import NDArray, Shape
 from spatialdata import SpatialData, bounding_box_query
 from spatialdata.models._utils import MappingToCoordinateSystem_t
 from spatialdata.models.models import ScaleFactors_t
